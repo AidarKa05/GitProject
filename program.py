@@ -1,6 +1,6 @@
-def main():
-    print('Hello world!')
+def main(name):
+    print(f'Hi, {name}')
 
 
 if __name__ == '__main__':
-    main()
+    main('PyCharm')
