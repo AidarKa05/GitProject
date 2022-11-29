@@ -2,21 +2,37 @@ import pygame
 
 
 pygame.init()
-a, n = [int(el) for el in input().split()]
-if a % n == 0:
-    width = a / n
-    size = (a, a)
-    screen = pygame.display.set_mode(size)
-    pygame.display.set_caption('Шахматная клетка')
-    screen.fill((0, 0, 0))
-    for x in range(n):
-        for y in range(n):
-            if x % 2 == 0 and y % 2 == 0:
-                screen.fill((255, 255, 255), pygame.Rect(x * width, y * width, x * width + width, y * width + width))
+w, h = 800, 600
+size = (w, h)
+screen = pygame.display.set_mode(size)
+pygame.display.set_caption('Жёлтый круг')
+screen.fill((0, 100, 255))
 
-    while pygame.event.wait().type != pygame.QUIT:
+fps = 1
+clock = pygame.time.Clock()
+
+running = True
+drawing = False
+r = 0
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            coord = event.pos
+            r = 0
+    while r != 1:
+        pygame.draw.circle(screen, (255, 255, 0), coord, r)
         pygame.display.flip()
-
-    pygame.quit()
-else:
-    print('Неправильный формат ввода')
+        r += 10
+        clock.tick(fps)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                r = 1
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                screen.fill((0, 0, 255))
+                pygame.display.flip()
+                coord = event.pos
+                r = 0
+pygame.quit()
