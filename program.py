@@ -1,79 +1,118 @@
+import sys
 import pygame
-
-white = (255, 255, 255)
-lw = 1
-
-
-class Board:
-    def __init__(self, width, height):
-        self.w = width
-        self.h = height
-        self.board = [[0] * width for _ in range(height)]
-        self.left = 10
-        self.top = 10
-        self.cell_size = 50
-
-    def set_view(self, left, top, sell_size):
-        self.left = left
-        self.top = top
-        self.cell_size = sell_size
-
-    def render(self, screen):
-        for i in range(self.h):
-            for j in range(self.w):
-                if self.board[i][j] == 0:
-                    pygame.draw.rect(screen, white, (self.left + self.cell_size * j, self.top + self.cell_size * i,
-                                                     self.cell_size, self.cell_size), lw)
-                else:
-                    pygame.draw.rect(screen, white, (self.left + self.cell_size * j, self.top + self.cell_size * i,
-                                                     self.cell_size, self.cell_size))
-
-    def get_click(self, mouse_pos):
-        cell = self.get_cell(mouse_pos)
-        self.on_click(cell)
-
-    def on_click(self, cell_coords):
-        x = cell_coords[0]
-        y = cell_coords[1]
-        if x == -1 or y == -1:
-            return
-        if self.board[y][x] == 1:
-            self.board[y][x] = 0
-        else:
-            self.board[y][x] = 1
-
-    def get_cell(self, mouse_pos):
-        x = (mouse_pos[0] - self.left) // self.cell_size
-        y = (mouse_pos[1] - self.top) // self.cell_size
-        if mouse_pos[0] < self.left or mouse_pos[0] > self.w * self.cell_size + self.left:
-            x = -1
-        if mouse_pos[1] < self.top or mouse_pos[1] > self.h * self.cell_size + self.top:
-            y = -1
-        # print(f'({x}, {y})')
-        # if x < 0 or y < 0:
-        # print('None')
-        return x, y
+import os
+from random import randint
 
 
-if __name__ == '__main__':
-    pygame.init()
-    size = width, height = 500, 600
-    screen = pygame.display.set_mode(size)
-    pygame.display.set_caption("Координаты клетки")
+balls = pygame.sprite.Group() # вместо списка группа спрайтов (пока пустая)
+fps = 60
+DELTA = 5 # Скорость шариков (можно менять)
+COUNT_BALLS = 5 # Количество шариков на поле (можно менять)
+SIZE = W, H = 800, 600 # Размер поля (можно менять)
 
-    board = Board(5, 7)
-    board.set_view(80, 80, 50)
 
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                board.get_click(event.pos)
+# универсальная функция подгрузки изображения
+def load_image(name, colorkey=None):
+    # картинки находятся в папке "data"
+    fullname = os.path.join('data', name)
+    # если файл не существует, то выходим
+    if not os.path.isfile(fullname):
+        print(f'Файл с изображением "{fullname}" не найден')
+        sys.exit()
+    image = pygame.image.load(fullname)
+    if colorkey is not None:
+        # Для повышения производительности обычно
+        # целесообразно преобразовать изображение
+        # в тот же формат пикселей, что и экран.
+        image = image.convert()
+        if colorkey == -1:
+            colorkey = image.get_at((0, 0))
+        image.set_colorkey(colorkey)
+    else:
+        # если изображение содержит прозрачность
+        # (альфа-значение указано явно: 0 - 255)
+        image = image.convert_alpha()
+    return image
 
-        screen.fill((0, 0, 0))
-        board.render(screen)
 
-        pygame.display.flip()
-    pygame.quit()
+# класс шара наследуем от группы спрайтов
+class Ball(pygame.sprite.Sprite):
+    def __init__(self, mouse_pos):
+        # ВАЖНО вызвать конструктор родительского класса Sprite
+        pygame.sprite.Sprite.__init__(self)
+        self.x = mouse_pos[0]
+        self.y = mouse_pos[1]
+        # подгружаем в спрайт изображение мяча
+        img = load_image("ball.png")
+        # приводим к нужному размеру
+        self.image = pygame.transform.scale(img, (50, 50))
+        # делаем копию для вращения
+        self.img_copy = self.image.copy()
+        # вычисляем tick на момент создания экземпляра
+        self.last_update = pygame.time.get_ticks()
+        # угол вращения
+        self.angle = 0
+        # получаем прямоугольник изображения
+        self.rect = self.image.get_rect()
+        # центрируем мяч относительно курсора мыши
+        self.rect.x = self.x - self.rect.w // 2
+        self.rect.y = self.y - self.rect.h // 2
+        self.deltaX = DELTA
+        self.deltaY = DELTA
+
+    # перемещение, управление прямо в классе  
+    def update(self):
+        self.rotate() # вращаем в полёте
+        self.rect.x -= self.deltaX
+        self.rect.y -= self.deltaY
+        if self.rect.x <= 0 or self.rect.x + self.rect.w >= W:
+            self.deltaX = -self.deltaX
+        if self.rect.y <= 0 or self.rect.y + self.rect.h >= H:
+            self.deltaY = -self.deltaY
+
+    # вращение
+    def rotate(self):
+        # текущий tick
+        now = pygame.time.get_ticks()
+        # на каждую половину tick-ов
+        if now - self.last_update > fps // 2:
+            # обновляем tick для следующего поворота
+            self.last_update = now
+            # смещаемся на 1/2 от fps
+            self.angle = (self.angle + (fps // 2)) % 360
+            # прорисовываем повернутое изображение
+            new_image = pygame.transform.rotate(self.img_copy, self.angle)
+            old_center = self.rect.center
+            self.image = new_image
+            self.rect = self.image.get_rect()
+            self.rect.center = old_center
+        
+
+pygame.init()
+pygame.display.set_caption('Шарики')
+screen = pygame.display.set_mode(SIZE)
+clock = pygame.time.Clock()
+screen.fill((0, 0, 0))
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            # создаём экземпляр мяча
+            ball = Ball(event.pos)
+            # и добавляем его в группу
+            balls.add(ball)
+    screen.fill((0, 0, 0))
+    if len(balls) > COUNT_BALLS:
+        balls.remove(ball)
+    # вызываем метод update для всей группы
+    balls.update()
+    # прорисовываем все мячи
+    balls.draw(screen)
+    # обновляем экран, всё, как обычно
+    pygame.display.update()
+    clock.tick(fps)
+pygame.display.quit()
+pygame.quit()
+sys.exit()
